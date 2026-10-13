@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ล่าสมบัติมรณะ - คณิตศาสตร์ ป.2</title>
+    <!-- Google Font: Mitr -->
+    <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Tone.js CDN for Web Audio Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <!-- MediaPipe Hands & Camera Utils CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Mitr', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #111;
+        }
+
+        #webcam-video {
+            display: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Screen Layout & Overlay */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(20, 24, 82, 0.95), rgba(75, 19, 115, 0.95));
+            color: #fff;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 24px;
+            padding: 35px;
+            width: 620px;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-size: 2.6rem;
+            color: #FFD700;
+            margin-bottom: 15px;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            color: #f1f2f6;
+            line-height: 1.6;
+        }
+
+        ul {
+            text-align: left;
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        /* System Check List */
+        .check-list {
+            margin: 20px 0;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .check-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #FFD700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .check-status {
+            font-weight: bold;
+        }
+        .check-status.success { color: #2ecc71; }
+        .check-status.error { color: #e74c3c; }
+
+        /* Buttons */
+        .btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #27ae60, 0 10px 20px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+            margin-top: 10px;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #27ae60, 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            background: #7f8c8d;
+            box-shadow: 0 6px 0 #6d7f81;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* HUD & Gameplay UI */
+        #game-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+        }
+
+        .hud-top {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            padding: 10px 25px;
+            border-radius: 30px;
+            border: 2px solid rgba(255,215,0,0.3);
+            pointer-events: auto;
+        }
+
+        .hud-box {
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            min-width: 90px;
+        }
+
+        .hud-box span {
+            display: block;
+            color: #FFD700;
+            font-size: 1.35rem;
+        }
+
+        #notification-banner {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            color: #FFD700;
+            padding: 6px 24px;
+            border-radius: 20px;
+            font-size: 1.15rem;
+            font-weight: 500;
+            border: 1px solid rgba(255,215,0,0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        #popup-center {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            font-size: 3.8rem;
+            font-weight: 700;
+            opacity: 0;
+            transition: all 0.25s ease;
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+        #popup-center.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.15);
+        }
+        .popup-green { color: #2ecc71; }
+        .popup-red { color: #e74c3c; }
+
+        /* Side Controls */
+        .side-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .toggle-btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #27ae60;
+            transition: all 0.08s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 140px;
+        }
+        .toggle-btn.off {
+            background: #2c3e50;
+            box-shadow: 0 4px 0 #1a252f;
+        }
+        .toggle-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #27ae60;
+        }
+        .toggle-btn.off:active {
+            box-shadow: 0 1px 0 #1a252f;
+        }
+
+        /* Layout Area Dividers & Transparency */
+        .zone-divider-left {
+            position: absolute;
+            top: 0;
+            left: 25%;
+            width: 2px;
+            height: 100%;
+            background: rgba(255, 215, 0, 0.2);
+            pointer-events: none;
+        }
+        .zone-divider-right {
+            position: absolute;
+            top: 0;
+            left: 75%;
+            width: 2px;
+            height: 100%;
+            background: rgba(255, 215, 0, 0.2);
+            pointer-events: none;
+        }
+        .zone-left-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 25%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+        }
+        .zone-right-bg {
+            position: absolute;
+            top: 0;
+            left: 75%;
+            width: 25%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+        }
+
+        /* 3D Object HTML Labels */
+        .word-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #FFD700;
+            color: #FFD700;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        }
+
+        /* Charge Bar HUD */
+        #charge-hud-container {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            z-index: 6;
+        }
+        .charge-track {
+            width: 14px;
+            height: 110px;
+            background: rgba(0,0,0,0.6);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 7px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .charge-fill {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #f1c40f, #2ecc71);
+            transition: height 0.05s linear;
+        }
+        .charge-label {
+            margin-top: 5px;
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+    <video id="webcam-video" playsinline></video>
+    <div id="canvas-container"></div>
+
+    <!-- UI Zones Guides -->
+    <div class="zone-left-bg"></div>
+    <div class="zone-right-bg"></div>
+    <div class="zone-divider-left"></div>
+    <div class="zone-divider-right"></div>
+
+    <!-- Screen 1: Welcome & Rules -->
+    <div id="welcome-screen" class="screen">
+        <div class="card">
+            <h1>🏴‍☠️ ล่าสมบัติมรณะ</h1>
+            <p>เกมผจญภัยคณิตศาสตร์สุดมันส์สำหรับน้อง ๆ ชั้น ป.2!</p>
+            <ul>
+                <li><strong>วิธีควบคุม:</strong> ใช้กล้องเว็บแคมตรวจจับมือของคุณ</li>
+                <li><strong>การเลือกคำตอบ:</strong> กำมือ (Fist) ค้างไว้เหนือกล่องสมบัติซ้าย, กลาง, หรือขวาเพื่อเลือกตอบคำตอบ!</li>
+                <li><strong>โบนัสอัญมณี:</strong> คว้าเหรียญและหีบสมบัติเพื่อสะสมคะแนน</li>
+            </ul>
+            <button class="btn" id="start-setup-btn">เริ่มผจญภัยกันเลย!</button>
+        </div>
+    </div>
+
+    <!-- Screen 2: System Setup & Camera Check -->
+    <div id="setup-screen" class="screen hidden">
+        <div class="card">
+            <h1>⚙️ ตรวจสอบระบบเว็บแคม</h1>
+            <p>โปรดอนุญาตการใช้งานกล้องเว็บแคมเพื่อเริ่มใช้งานระบบตรวจจับมือ</p>
+            
+            <div class="check-list">
+                <div class="check-item">
+                    <span>เชื่อมต่อเว็บแคม (Webcam)</span>
+                    <span id="cam-status" class="check-status"><div class="spinner"></div></span>
+                </div>
+                <div class="check-item">
+                    <span>โหลดโมเดล AI (MediaPipe Hands)</span>
+                    <span id="ai-status" class="check-status"><div class="spinner"></div></span>
+                </div>
+            </div>
+
+            <button class="btn" id="launch-game-btn" disabled>เข้าสู่เกาะสมบัติ</button>
+        </div>
+    </div>
+
+    <!-- Screen 3: Game HUD -->
+    <div id="game-ui">
+        <div class="hud-top">
+            <div class="hud-box">คะแนน <span id="hud-score">0</span></div>
+            <div class="hud-box">ด่าน <span id="hud-level">1 / 10</span></div>
+            <div class="hud-box">เวลา <span id="hud-timer">30</span>s</div>
+        </div>
+
+        <div id="notification-banner">โจทย์: กำมือค้างไว้ที่กล่องคำตอบที่ถูกต้อง!</div>
+
+        <div class="side-controls">
+            <button id="toggle-sound-btn" class="toggle-btn">🔊 เสียง <span id="sound-status-text">เปิด</span></button>
+            <button id="toggle-cam-btn" class="toggle-btn">📷 กล้อง <span id="cam-status-text">เปิด</span></button>
+        </div>
+    </div>
+
+    <!-- Center Popup Feedback -->
+    <div id="popup-center"></div>
+
+    <!-- Hand Charge Bar Indicator -->
+    <div id="charge-hud-container">
+        <div class="charge-track">
+            <div id="charge-fill-bar" class="charge-fill"></div>
+        </div>
+        <div id="charge-text-label" class="charge-label">กำลังเลือก...</div>
+    </div>
+
+    <!-- HTML Labels Container for 3D boxes -->
+    <div id="labels-container"></div>
+
+    <!-- Screen 4: Game Over / Victory Report -->
+    <div id="gameover-screen" class="screen hidden">
+        <div class="card">
+            <h1 id="end-title">🎉 จบการผจญภัย!</h1>
+            <p id="end-message" style="font-size: 1.25rem; margin: 20px 0;">คุณคือนักล่าสมบัติผู้พิชิตคณิตศาสตร์ ป.2!</p>
+            <div style="font-size: 1.8rem; color: #FFD700; margin-bottom: 25px;">
+                คะแนนรวม: <span id="final-score">0</span> คะแนน
+            </div>
+            <button class="btn" id="restart-btn">เล่นใหม่อีกครั้ง</button>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer;
+        let webcamElement = document.getElementById('webcam-video');
+        let videoTexture, videoPlane;
+        let hands, cameraUtilsInstance;
+        
+        // Game states
+        let gameState = 'WELCOME'; // WELCOME, SETUP, PLAYING, GAMEOVER
+        let score = 0;
+        let currentLevel = 0;
+        let timeLeft = 30;
+        let timerInterval = null;
+        let soundEnabled = true;
+        let cameraVisible = true;
+        
+        // Hand tracking data
+        let latestHandResults = null;
+        let normalizedHandPos = { x: 0.5, y: 0.5 };
+        let isFistClosed = false;
+        let hoveredOptionIndex = -1;
+        let selectionHoldTimer = 0;
+        const SELECTION_HOLD_DURATION = 1.5; // seconds to hold fist
+        let lastFrameTime = performance.now();
+
+        // Tone.js Synth for sound effects
+        let synth, chimeSynth;
+        function initAudio() {
+            try {
+                synth = new Tone.Synth().toDestination();
+                chimeSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+            } catch(e) {
+                console.warn("Audio initialization error:", e);
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                Tone.start();
+                const now = Tone.now();
+                if (type === 'correct') {
+                    chimeSynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", now);
+                } else if (type === 'wrong') {
+                    synth.triggerAttackRelease("G2", "4n", now);
+                } else if (type === 'click') {
+                    synth.triggerAttackRelease("C6", "16n", now);
+                } else if (type === 'charge') {
+                    synth.triggerAttackRelease("E5", "32n", now);
+                }
+            } catch(e) {}
+        }
+
+        // Math Puzzles Grade 2 Curriculum (Addition, Subtraction, Word problems, Comparison)
+        const levelsData = [
+            { question: "15 + 12 = ?", options: ["25", "27", "37"], correct: 1 },
+            { question: "48 - 14 = ?", options: ["34", "36", "24"], correct: 0 },
+            { question: "24 + 18 = ?", options: ["42", "32", "40"], correct: 0 },
+            { question: "70 - 25 = ?", options: ["45", "55", "35"], correct: 0 },
+            { question: "แม่มีส้ม 36 ผล ซื้อมาเพิ่มอีก 14 ผล แม่มีส้มทั้งหมดกี่ผล?", options: ["40 ผล", "50 ผล", "56 ผล"], correct: 1 },
+            { question: "น้องมีเงิน 85 บาท ซื้อขนมไป 35 บาท น้องเหลือเงินกี่บาท?", options: ["40 บาท", "50 บาท", "60 บาท"], correct: 1 },
+            { question: "5 × 4 = ?", options: ["18", "20", "25"], correct: 1 },
+            { question: "จำนวนใดมีค่ามากที่สุด: 542, 452, 524", options: ["452", "524", "542"], correct: 2 },
+            { question: "100 - 37 = ?", options: ["63", "73", "67"], correct: 0 },
+            { question: "พ่อมีเสื้อ 12 ตัว ซื้อเพิ่มอีก 28 ตัว พ่อมีเสื้อทั้งหมดกี่ตัว?", options: ["30 ตัว", "40 ตัว", "50 ตัว"], correct: 1 }
+        ];
+
+        // 3D Objects containers
+        let chestGroup = new THREE.Group();
+        let chestMeshes = [];
+        let labelElements = [];
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0a0518, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 2, 8);
+            camera.lookAt(0, 1, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfff5cc, 1.2);
+            dirLight.position.set(5, 10, 7);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const pointLight = new THREE.PointLight(0x3498db, 2, 15);
+            pointLight.position.set(0, 5, 2);
+            scene.add(pointLight);
+
+            // Background Video Plane for AR Camera Feed
+            const videoGeo = new THREE.PlaneGeometry(16, 9);
+            const videoMat = new THREE.MeshBasicMaterial({ color: 0x050515, side: THREE.DoubleSide });
+            videoPlane = new THREE.Mesh(videoGeo, videoMat);
+            videoPlane.position.set(0, 0, -10);
+            videoPlane.scale.set(1.8, 1.8, 1.8);
+            scene.add(videoPlane);
+
+            // Create treasure chests in 3D (Left, Center, Right)
+            createTreasureChests();
+
+            // Hand cursor indicator in 3D
+            createHandCursor();
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        let handCursorMesh;
+        function createHandCursor() {
+            const geo = new THREE.SphereGeometry(0.2, 32, 32);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: 0x3498db, 
+                emissive: 0x2980b9,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            handCursorMesh = new THREE.Mesh(geo, mat);
+            handCursorMesh.position.set(0, 0, 2);
+            scene.add(handCursorMesh);
+        }
+
+        function createTreasureChests() {
+            chestGroup = new THREE.Group();
+            scene.add(chestGroup);
+
+            const positions = [-3.2, 0.0, 3.2]; // Left, Center, Right positions
+
+            for (let i = 0; i < 3; i++) {
+                const singleChest = new THREE.Group();
+
+                // Chest base (Wooden box)
+                const baseGeo = new THREE.BoxGeometry(1.8, 1.1, 1.4);
+                const baseMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.6 });
+                const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+                baseMesh.position.y = 0.55;
+                baseMesh.castShadow = true;
+                singleChest.add(baseMesh);
+
+                // Gold trim and lock
+                const trimGeo = new THREE.BoxGeometry(1.86, 0.2, 1.46);
+                const trimMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.8, roughness: 0.2 });
+                const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+                trimMesh.position.y = 1.0;
+                singleChest.add(trimMesh);
+
+                // Chest lid (domed top)
+                const lidGeo = new THREE.CylinderGeometry(0.9, 0.9, 1.4, 16, 1, false, 0, Math.PI);
+                const lidMat = new THREE.MeshStandardMaterial({ color: 0xA0522D, roughness: 0.5 });
+                const lidMesh = new THREE.Mesh(lidGeo, lidMat);
+                lidMesh.rotation.z = Math.PI / 2;
+                lidMesh.position.set(0, 1.1, 0);
+                singleChest.add(lidMesh);
+
+                // Floating crystals / gems on top of chest
+                const gemGeo = new THREE.OctahedronGeometry(0.35);
+                const gemMat = new THREE.MeshStandardMaterial({ 
+                    color: i === 0 ? 0xe74c3c : (i === 1 ? 0x2ecc71 : 0x9b59b6),
+                    emissive: i === 0 ? 0x962d22 : (i === 1 ? 0x1e8449 : 0x512e5f),
+                    roughness: 0.1,
+                    metalness: 0.9
+                });
+                const gemMesh = new THREE.Mesh(gemGeo, gemMat);
+                gemMesh.name = "gem";
+                gemMesh.position.set(0, 2.0, 0);
+                singleChest.add(gemMesh);
+
+                singleChest.position.set(positions[i], 0, 0);
+                chestGroup.add(singleChest);
+                chestMeshes.push(singleChest);
+
+                // Create HTML label overlay
+                const label = document.createElement('div');
+                label.className = 'word-label';
+                label.innerText = `กล่องที่ ${i+1}`;
+                document.getElementById('labels-container').appendChild(label);
+                labelElements.push({ element: label, mesh: singleChest });
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function initMediaPipe() {
+            const videoElement = document.getElementById('webcam-video');
+            
+            hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.65,
+                minTrackingConfidence: 0.65
+            });
+
+            hands.onResults(onHandResults);
+
+            cameraUtilsInstance = new Camera(videoElement, {
+                onFrame: async () => {
+                    if (gameState === 'PLAYING' || gameState === 'SETUP') {
+                        await hands.send({ image: videoElement });
+                    }
+                },
+                width: 1280,
+                height: 720
+            });
+
+            cameraUtilsInstance.start()
+                .then(() => {
+                    document.getElementById('cam-status').innerText = 'พร้อมใช้งาน';
+                    document.getElementById('cam-status').className = 'check-status success';
+                    document.getElementById('ai-status').innerText = 'พร้อมใช้งาน';
+                    document.getElementById('ai-status').className = 'check-status success';
+                    document.getElementById('launch-game-btn').disabled = false;
+                })
+                .catch((err) => {
+                    console.error("Webcam error:", err);
+                    document.getElementById('cam-status').innerText = 'ไม่พบกล้อง';
+                    document.getElementById('cam-status').className = 'check-status error';
+                });
+
+            // Create Three.js video texture from webcam element
+            if (!videoTexture) {
+                videoTexture = new THREE.VideoTexture(videoElement);
+                videoTexture.minFilter = THREE.LinearFilter;
+                videoTexture.magFilter = THREE.LinearFilter;
+                videoPlane.material.map = videoTexture;
+                videoPlane.material.needsUpdate = true;
+            }
+        }
+
+        function onHandResults(results) {
+            latestHandResults = results;
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Average palm center position (landmark 0 or 9)
+                const palmX = landmarks[9].x;
+                const palmY = landmarks[9].y;
+
+                // Smooth position
+                normalizedHandPos.x = normalizedHandPos.x * 0.7 + palmX * 0.3;
+                normalizedHandPos.y = normalizedHandPos.y * 0.7 + palmY * 0.3;
+
+                // Check fist gesture (Compare fingertips to wrist/palm base)
+                // If fingertips (4, 8, 12, 16, 20) are close to palm base (0), hand is closed into a fist.
+                const wrist = landmarks[0];
+                let avgTipDist = 0;
+                const tipIndices = [8, 12, 16, 20];
+                tipIndices.forEach(idx => {
+                    const tip = landmarks[idx];
+                    const dist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y, tip.z - wrist.z);
+                    avgTipDist += dist;
+                });
+                avgTipDist /= tipIndices.length;
+
+                // Threshold for fist
+                isFistClosed = avgTipDist < 0.28;
+            } else {
+                isFistClosed = false;
+            }
+        }
+
+        document.getElementById('start-setup-btn').addEventListener('click', () => {
+            playSound('click');
+            document.getElementById('welcome-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            initMediaPipe();
+        });
+
+        document.getElementById('launch-game-btn').addEventListener('click', () => {
+            playSound('click');
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-ui').style.display = 'block';
+            startGame();
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            playSound('click');
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('game-ui').style.display = 'block';
+            startGame();
+        });
+
+        // Toggle sound button
+        document.getElementById('toggle-sound-btn').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('toggle-sound-btn');
+            const txt = document.getElementById('sound-status-text');
+            if (soundEnabled) {
+                btn.className = 'toggle-btn';
+                txt.innerText = 'เปิด';
+            } else {
+                btn.className = 'toggle-btn off';
+                txt.innerText = 'ปิด';
+            }
+        });
+
+        // Toggle camera video visibility
+        document.getElementById('toggle-cam-btn').addEventListener('click', () => {
+            cameraVisible = !cameraVisible;
+            const btn = document.getElementById('toggle-cam-btn');
+            const txt = document.getElementById('cam-status-text');
+            if (cameraVisible) {
+                btn.className = 'toggle-btn';
+                txt.innerText = 'เปิด';
+                videoPlane.visible = true;
+            } else {
+                btn.className = 'toggle-btn off';
+                txt.innerText = 'ปิด';
+                videoPlane.visible = false;
+            }
+        });
+
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            currentLevel = 0;
+            document.getElementById('hud-score').innerText = score;
+            loadLevel(currentLevel);
+            startTimer();
+        }
+
+        function startTimer() {
+            timeLeft = 30;
+            document.getElementById('hud-timer').innerText = timeLeft;
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                if (gameState !== 'PLAYING') return;
+                timeLeft--;
+                document.getElementById('hud-timer').innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    // Time out for current question, penalty or next level
+                    showPopup("หมดเวลา!", "red");
+                    playSound('wrong');
+                    nextLevel();
+                }
+            }, 1000);
+        }
+
+        function loadLevel(levelIndex) {
+            if (levelIndex >= levelsData.length) {
+                endGame(true);
+                return;
+            }
+            currentLevel = levelIndex;
+            document.getElementById('hud-level').innerText = `${currentLevel + 1} / ${levelsData.length}`;
+            
+            const currentData = levelsData[currentLevel];
+            document.getElementById('notification-banner').innerText = `โจทย์: ${currentData.question}`;
+
+            // Update box labels with options
+            for (let i = 0; i < 3; i++) {
+                labelElements[i].element.innerText = `กล่อง ${i+1}: ${currentData.options[i]}`;
+            }
+
+            selectionHoldTimer = 0;
+            document.getElementById('charge-hud-container').style.display = 'none';
+        }
+
+        function nextLevel() {
+            currentLevel++;
+            if (currentLevel >= levelsData.length) {
+                endGame(true);
+            } else {
+                loadLevel(currentLevel);
+                startTimer();
+            }
+        }
+
+        function endGame(isVictory) {
+            gameState = 'GAMEOVER';
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('game-ui').style.display = 'none';
+            document.getElementById('charge-hud-container').style.display = 'none';
+            document.getElementById('gameover-screen').classList.remove('hidden');
+            
+            document.getElementById('end-title').innerText = isVictory ? '🏆 ยินดีด้วย! พิชิตเกาะสมบัติสำเร็จ' : '💀 จบการผจญภัย';
+            document.getElementById('final-score').innerText = score;
+        }
+
+        function showPopup(text, type) {
+            const popup = document.getElementById('popup-center');
+            popup.innerText = text;
+            popup.className = type === 'green' ? 'popup-green show' : 'popup-red show';
+            setTimeout(() => {
+                popup.className = '';
+            }, 1200);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+
+            // Rotate gems on chests for visual richness
+            chestGroup.children.forEach((chest, idx) => {
+                const gem = chest.getObjectByName("gem");
+                if (gem) {
+                    gem.rotation.y += 0.02 * (idx + 1);
+                    gem.position.y = 2.0 + Math.sin(now * 0.003 + idx) * 0.15;
+                }
+            });
+
+            if (gameState === 'PLAYING') {
+                // Map normalized hand position (0 to 1) to screen & 3D world coordinates
+                // Screen layout: Left zone (0 - 25%), Center zone (25 - 75%), Right zone (75 - 100%)
+                const screenX = 1.0 - normalizedHandPos.x; // Mirror webcam horizontally
+                const screenY = normalizedHandPos.y;
+
+                // Update 3D Hand Cursor position
+                const worldX = (screenX - 0.5) * 8.0;
+                const worldY = (0.5 - screenY) * 4.0 + 1.5;
+                handCursorMesh.position.set(worldX, worldY, 1.0);
+
+                // Determine hovered chest based on horizontal screen position
+                let currentHover = -1;
+                if (screenX < 0.3) currentHover = 0;      // Left box
+                else if (screenX > 0.7) currentHover = 2; // Right box
+                else currentHover = 1;                    // Center box
+
+                hoveredOptionIndex = currentHover;
+
+                // Handle fist charge selection
+                const chargeContainer = document.getElementById('charge-hud-container');
+                const fillBar = document.getElementById('charge-fill-bar');
+                const chargeLabel = document.getElementById('charge-text-label');
+
+                if (isFistClosed) {
+                    selectionHoldTimer += delta;
+                    chargeContainer.style.display = 'flex';
+                    // Position near hand cursor on screen
+                    chargeContainer.style.left = `${screenX * window.innerWidth - 30}px`;
+                    chargeContainer.style.top = `${screenY * window.innerHeight - 130}px`;
+
+                    const progress = Math.min(selectionHoldTimer / SELECTION_HOLD_DURATION, 1.0);
+                    fillBar.style.height = `${progress * 100}%`;
+                    chargeLabel.innerText = `กล่องที่ ${hoveredOptionIndex + 1}`;
+
+                    if (selectionHoldTimer >= SELECTION_HOLD_DURATION) {
+                        // Selection locked! Check answer
+                        checkAnswer(hoveredOptionIndex);
+                        selectionHoldTimer = 0;
+                        chargeContainer.style.display = 'none';
+                    }
+                } else {
+                    selectionHoldTimer = 0;
+                    chargeContainer.style.display = 'none';
+                }
+
+                // Update 3D HTML labels projection
+                labelElements.forEach((item, idx) => {
+                    const tempVector = new THREE.Vector3();
+                    item.mesh.getWorldPosition(tempVector);
+                    tempVector.y += 1.4; // above chest
+                    tempVector.project(camera);
+
+                    const x = (tempVector.x *  .5 + .5) * window.innerWidth;
+                    const y = (tempVector.y * -.5 + .5) * window.innerHeight;
+
+                    item.element.style.transform = `translate(-50%, -50%)`;
+                    item.element.style.left = `${x}px`;
+                    item.element.style.top = `${y}px`;
+
+                    // Highlight hovered box label
+                    if (hoveredOptionIndex === idx) {
+                        item.element.style.borderColor = '#2ecc71';
+                        item.element.style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
+                    } else {
+                        item.element.style.borderColor = '#FFD700';
+                        item.element.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                    }
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function checkAnswer(selectedOption) {
+            const currentData = levelsData[currentLevel];
+            if (selectedOption === currentData.correct) {
+                score += 10;
+                document.getElementById('hud-score').innerText = score;
+                showPopup("ถูกต้อง! +10 คะแนน", "green");
+                playSound('correct');
+            } else {
+                showPopup("ผิดพลาด!", "red");
+                playSound('wrong');
+            }
+
+            // Pause slightly before next level
+            gameState = 'PAUSED';
+            if (timerInterval) clearInterval(timerInterval);
+            
+            setTimeout(() => {
+                if (gameState === 'PAUSED') {
+                    gameState = 'PLAYING';
+                    nextLevel();
+                }
+            }, 1400);
+        }
+
+        // Initialize on window load
+        window.onload = function () {
+            initAudio();
+            initThreeJS();
+            animate();
+        };
+    </script>
+</body>
+</html>
